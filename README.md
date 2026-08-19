@@ -1,65 +1,80 @@
-# Picowinder: RP2040-based USB adapter for the Microsoft Sidewinder Force Feedback Pro joystick
-Picowinder is an adapter that uses an RP2040 (i.e., a Raspberry Pi Pico) to turn the [Microsoft Sidewinder Force Feedback Pro joystick](https://www.youtube.com/watch?v=evwn435x0dM) into a USB joystick, including force-feedback communication.
+# PicoWinder-FFB-PRO
 
-# Compatibility
-Picowinder is compatible with both Linux and Windows. It has not been tested elsewhere.
+Modern USB adapter firmware for the **Microsoft SideWinder Force Feedback Pro (Gameport)** using an RP2040 / RP2040-Zero.
 
-The adapter is mostly compliant with the HID (Human Interface Device) PID (Physical Interface Device) spec.
+This project is a continuation of the original **PicoWinder** project by Nolan Nicholson:
 
-# How to Build
+https://github.com/NolanNicholson/picowinder
 
-## Build the Adapter
-Strictly speaking, this adapter can be built using nothing except a Raspberry Pi Pico and a GamePort connector. A few optional resistors are also recommended.
+## Why this project exists
 
-Any pins not listed on both the GamePort side and the Pico side can be left disconnected.
+The original PicoWinder project provided the fundamental hardware interface and USB HID / Force Feedback implementation required to connect the Gameport Microsoft SideWinder Force Feedback Pro to a modern PC.
 
-| GamePort Pin                       | Recommended Resistor | Pico Pin        | Notes                                      | 
-|------------------------------------|----------------------|-----------------|--------------------------------------------|
-| 1 (VCC)                            |                      | Pin 40 (VBUS)   |                                            | 
-| 2 (Button 1; Sidewinder CLK)       |                      | Pin 5 (GP3)     |                                            | 
-| 3 (Axis X1; Sidewinder Trigger 0)  | 2.2k ohm             | Pin 4 (GP2)     | GamePort pins 3 and 11 both connect to GP2 | 
-| 4 (GND)                            |                      | Any GND pin     |                                            |
-| 7 (Button 2; Sidewinder Data 0)    |                      | Pin 6 (GP4)     |                                            |
-| 10 (Button 3; Sidewinder Data 1)   |                      | Pin 7 (GP5)     |                                            |
-| 11 (Axis X2; Sidewinder Trigger 1) | 2.2k ohm             | Pin 4 (GP2)     |                                            |
-| 12 (MIDI TX)                       | 220 ohm              | Pin 1 (GP0)     |                                            |
-| 14 (Button 4; Sidewinder Data 2)   |                      | Pin 9 (GP6)     |                                            |
+However, during extensive testing on modern Windows systems, the original firmware did not provide reliable and complete Force Feedback operation.
 
+The project therefore evolved from an attempt to make the existing firmware work correctly into a substantially debugged, corrected and experimentally validated version.
 
-Alternately you can connect the Raspberry Pi Pico directly to the PCB using the following pinout, this will allow you to mount the Pico inside the housing of the controller.
+## Current release
 
+**PicoWinder FFB PRO A22 – FINAL / GOLDEN**
 
+The A20 firmware has been validated with:
 
-| Pin on PCB                         | Recommended Resistor | Pico Pin        | Notes                                      | 
-|------------------------------------|----------------------|-----------------|--------------------------------------------|
-| 1  (VCC)                           |                      | Pin 40 (VBUS)   |                                            | 
-| 2  (GND)                           |                      | Any GND pin     |                                            | 
-| 3  (MIDI TX)                       | 220 ohm              | Pin 1 (GP0)     |                                            | 
-| 4  N/C                             |                      | N/C             |                                            |
-| 5  (Button 1; Sidewinder CLK)      |                      | Pin 5 (GP3)     |                                            |
-| 6  (Button 2; Sidewinder Data 0)   |                      | Pin 6 (GP4)     |                                            |
-| 7  (Button 3; Sidewinder Data 1)   |                      | Pin 7 (GP5)     |                                            |
-| 8  (Button 4; Sidewinder Data 2)   |                      | Pin 9 (GP6)     |                                            |
-| 9  (Axis X2; Sidewinder Trigger 1) | 2.2k ohm             | Pin 4 (GP2)     | Pins 9 and 10 both connect to GP2          |
-| 10 N/C                             |                      | N/C             |                                            |
-| 11 (Axis X1; Sidewinder Trigger 0) | 2.2k ohm             | Pin 4 (GP2)     | Pins 9 and 10 both connect to GP2          |
+- Windows 10 / Windows 11
+- Microsoft SideWinder Force Feedback Pro Gameport
+- RP2040 / RP2040-Zero
+- DirectInput Force Feedback test applications
+- Condor 3
 
+Validated functionality includes:
 
+- USB HID joystick input
+- X / Y axes
+- throttle
+- twist / Z axis
+- buttons and trigger
+- approximately 1 kHz input reports
+- stable DirectInput Force Feedback
+- dynamic spring force
+- speed-dependent control force
+- trim force / equilibrium displacement
+- stall buffet
+- flutter
+- periodic effects
+- correct Force Feedback cleanup
+- no residual centering spring after application exit
+- no FFB/input freeze observed in the final validated firmware
 
+## Major fixes
 
-## Flash the Firmware
+Development from the original PicoWinder code included fixes and improvements to:
 
-To flash a release of the firmware to your Pico:
-1. Hold the BOOTSEL button while plugging the Pico in to your computer.
-2. Release the BOOTSEL button. The Pico should present itself as a storage drive.
-3. Drag the picowinder.uf2 file into that storage drive. It should automatically disconnect, and the Pico should reboot.
+- SideWinder reset and native autocenter handling
+- HID / Force Feedback effect handling
+- non-blocking communication
+- effect table handling
+- SideWinder message pacing
+- post-reset stabilization
+- stale Force Feedback effect IDs
+- periodic effect gain
+- spring force response
+- input jitter filtering
+- throttle filtering
+- Z-axis filtering
+- input report concurrency
+- firmware build and binary validation
 
-# Known Issues
+Full technical documentation and development history will be added to this repository.
 
-* Other than the Sidewinder Force Feedback Pro joystick, no other joysticks or peripherals are supported.
-* The adapter does not support plugging in the GamePort connector after USB has already connected. You must connect the GamePort first, then plug the USB in.
+## License and credits
 
-# Credits
+Based on the original **PicoWinder** project by **Nolan Nicholson**.
 
-* This project uses a lot of information from the [adapt-ffb-joy](https://github.com/tloimu/adapt-ffb-joy) project, and from the [reverse-engineering](https://www.descentbb.net/viewtopic.php?t=19061) that went into it.
-* In addition, several forks of adapt-ffb-joy, including those by [juchong](https://github.com/juchong/adapt-ffb-joy) and [jaybee](https://github.com/jaybee-git/adapt-ffb-joy), provided additional insight.
+Original project:
+https://github.com/NolanNicholson/picowinder
+
+This project retains the **GPL-3.0** license of the upstream project.
+
+Microsoft and SideWinder are trademarks of Microsoft Corporation.
+
+This is an independent community project and is not affiliated with or endorsed by Microsoft.
