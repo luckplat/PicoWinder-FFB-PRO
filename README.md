@@ -1,10 +1,10 @@
 # PicoWinder FFB PRO — FINAL
 
-Modern RP2040 USB firmware for the **Microsoft SideWinder Force Feedback Pro (Gameport)**, based on Nolan Nicholson's original **PicoWinder** project.
+USB firmware for the **Microsoft SideWinder Force Feedback Pro (Gameport)** using an RP2040 / RP2040-Zero.
 
-**PicoWinder FFB PRO** is a continuation and extensively debugged development of PicoWinder, created to provide reliable **USB HID joystick input and DirectInput Force Feedback on modern PCs**.
+This project is based on Nolan Nicholson's original **PicoWinder** and continues that work with a large number of fixes and changes aimed at getting reliable joystick input and real DirectInput Force Feedback on **Windows 10 and Windows 11**.
 
-The firmware has been tested with standard DirectInput Force Feedback utilities and extensively validated in real applications, including **Condor 3**.
+It has been tested with standard DirectInput FFB tools and extensively tested with **Condor 3**.
 
 <p align="center">
   <img src="Images/Picowinder_FFB_PRO_01.jpg" width="650" alt="Microsoft SideWinder Force Feedback Pro with PicoWinder FFB PRO adapter">
@@ -13,6 +13,7 @@ The firmware has been tested with standard DirectInput Force Feedback utilities 
 <p align="center">
   <em>Microsoft SideWinder Force Feedback Pro Gameport with the PicoWinder FFB PRO RP2040 USB adapter.</em>
 </p>
+
 <p align="center">
   <strong>Would you like a ready-built PicoWinder FFB PRO adapter?</strong><br>
   Feel free to contact me at <a href="mailto:luckplat@duck.com">luckplat@duck.com</a>
@@ -20,56 +21,53 @@ The firmware has been tested with standard DirectInput Force Feedback utilities 
 
 ---
 
-## Why this project exists
+## Why I made this
 
-The original PicoWinder project provided the fundamental RP2040 interface required to connect a Microsoft SideWinder Force Feedback Pro Gameport joystick to a modern computer.
+I originally had no intention of writing a new firmware.
 
-The original goal of this work was **not to create a new firmware**.
+The goal was simply to build the original PicoWinder adapter and use my SideWinder Force Feedback Pro on a current PC.
 
-The goal was simply to make the existing PicoWinder implementation work reliably.
+The joystick was detected by Windows and the basic controls worked, but the Force Feedback did not work reliably on my hardware. The same problems also appeared with generic DirectInput FFB test programs, so this was not just a Condor 3 compatibility problem.
 
-During testing on modern Windows systems, the upstream firmware could enumerate as a USB joystick and expose Force Feedback capabilities, but reliable and complete DirectInput FFB operation could not be obtained on our hardware.
+Among the problems seen during testing:
 
-The problems were not limited to Condor 3: generic DirectInput Force Feedback test applications could also fail to correctly create or execute effects.
+* FFB could stop after a few seconds
+* joystick input and FFB could freeze together
+* a strong centering force could remain after a reset
+* FFB often behaved mostly like a simple centering spring
+* dynamic effects were weak, missing or unreliable
 
-Typical symptoms included:
+I also could not find a reproducible public example of the **unmodified upstream firmware**, with a clearly identified build, providing complete and stable DirectInput FFB on Windows 10/11.
 
-* FFB stopping after a few seconds
-* joystick input and FFB freezing together
-* persistent native centering after reset
-* Force Feedback behaving mostly as a simple centering spring
-* dynamic effects being weak, missing or unreliable
-
-At the time this work was undertaken, no reproducible public demonstration was found showing the **unmodified upstream PicoWinder firmware** providing complete and stable DirectInput Force Feedback on a modern Windows PC with a clearly identified firmware build.
-
-The investigation therefore evolved into a complete debugging and validation effort.
+So what started as troubleshooting gradually became a full debugging and validation project.
 
 ---
 
 ## What works
 
-The final validated firmware provides:
+The FINAL firmware currently provides:
 
-* Microsoft SideWinder Force Feedback Pro Gameport → USB
-* USB HID joystick operation
+* SideWinder Force Feedback Pro Gameport → USB
+* Windows 10 / 11 support
+* USB HID joystick input
 * X / Y axes
 * throttle / slider
 * Rotation Z / twist
 * buttons and trigger
 * approximately **1 kHz** input reporting
-* stable Windows DirectInput Force Feedback
+* stable DirectInput Force Feedback
 * dynamic Spring effects
 * periodic effects
 * speed-dependent control resistance
 * trim / moving equilibrium point
 * stall buffet
 * high-speed flutter
-* clean effect shutdown
+* clean FFB shutdown
 * correct reset and native auto-center handling
 * X/Y jitter filtering
-* stable full-range throttle filtering
+* full-range throttle filtering
 * smooth Rotation-Z filtering
-* no FFB/input freeze observed during final validation
+* no FFB/input freeze observed in the final validation tests
 
 USB Product Name:
 
@@ -79,27 +77,29 @@ USB Product Name:
 
 ## The adapter
 
-The hardware is deliberately simple: an **RP2040 / RP2040-Zero** acts as the interface between the original SideWinder Gameport connection and USB.
+The hardware itself is quite simple.
+
+An **RP2040 / RP2040-Zero** sits between the original SideWinder Gameport connection and the PC.
 
 <p align="center">
   <img src="Images/Picowinder_FFB_PRO_02.jpg" width="700" alt="PicoWinder FFB PRO complete adapter">
 </p>
 
-The adapter retains the original SideWinder's own electronics and Force Feedback motors. The RP2040 handles the communication between the legacy SideWinder protocol and modern USB HID / DirectInput PID.
+The SideWinder keeps its original electronics, motors and external power supply. The RP2040 handles communication between the old SideWinder protocol and USB HID / DirectInput PID.
 
 <p align="center">
   <img src="Images/Picowinder_FFB_PRO_03.jpg" width="700" alt="PicoWinder FFB PRO RP2040 USB-C enclosure">
 </p>
 
-The RP2040 is housed in a small enclosure and connects to the PC through USB.
+In my build the RP2040 is housed in a small enclosure and connects to the PC through USB-C.
 
 ---
 
-## Force Feedback validation
+## Force Feedback testing
 
-Condor 3 was used extensively as a demanding real-world Force Feedback test environment.
+Condor 3 became a very useful real-world test application because it continuously changes several Force Feedback parameters during flight.
 
-USB captures showed the simulator dynamically creating and updating:
+USB captures showed Condor creating and updating:
 
 * Spring effects
 * periodic / Triangle effects
@@ -107,95 +107,101 @@ USB captures showed the simulator dynamically creating and updating:
 * Spring center position
 * START / STOP operations
 
-The final firmware correctly transfers those effects to the physical SideWinder.
+The final firmware transfers these correctly to the SideWinder.
 
-### Speed-dependent control force
+### Control force
 
-The stick remains relatively light at low speed and becomes progressively heavier as airspeed increases.
+The stick is relatively light at low speed and becomes progressively heavier as airspeed increases.
 
 ### Trim
 
-The Spring equilibrium point physically moves with trim, allowing the pilot to feel the trimmed stick position rather than merely experiencing a change in overall force.
+Trim actually moves the Spring equilibrium point.
+
+This means the physical neutral position of the stick moves with trim instead of simply changing overall force.
 
 ### Stall buffet
 
-Periodic effects become clearly perceptible close to the stall.
+Periodic effects become clearly noticeable close to the stall.
 
 ### Flutter
 
-High-speed periodic effects produce clearly noticeable flutter.
+At high speed the periodic effects produce clearly noticeable flutter.
 
-**Condor 3 is one of the main validation applications, but PicoWinder FFB PRO is not simulator-specific.**
+Condor 3 was one of the main applications used during development, but **PicoWinder FFB PRO is not specific to Condor**.
 
-The firmware implements standard **Windows DirectInput Force Feedback** and can therefore be used by other compatible applications and simulators.
+It implements standard **Windows DirectInput Force Feedback**, so other compatible applications can use it as well.
 
 ---
 
-## Main fixes and improvements
+## Main fixes
 
-The final firmware resulted from many targeted corrections rather than one large rewrite.
+This firmware was not the result of one big rewrite.
 
-The major areas addressed include:
+Most of the progress came from finding one specific problem, testing it, fixing it, and moving on to the next one.
 
-* native SideWinder auto-center reactivation after reset
-* Force Feedback effect-table handling
-* blocking communication inside USB/HID callbacks
+The main areas changed were:
+
+* native SideWinder auto-center after reset
+* FFB effect-table handling
+* blocking operations inside USB/HID callbacks
 * asynchronous SideWinder communication
 * post-reset stabilization
 * SideWinder message pacing
-* stale Force Feedback effect IDs
-* periodic-effect gain translation
+* stale FFB effect IDs
+* periodic-effect gain
 * Spring response
-* X/Y input jitter
+* X/Y jitter
 * throttle / slider filtering
 * Rotation-Z filtering
 * input-buffer concurrency
 
-### Stale Force Feedback effect ID
+### Trigger kick / stale effect ID
 
-One particularly important problem involved the original diagnostic trigger-kick effect.
+One particularly difficult problem came from the original diagnostic trigger-kick effect.
 
-After a device reset, its old effect ID could remain locally while an application reused the same ID for another Force Feedback effect.
+After a device reset, the firmware could still remember the old effect ID while Windows or an application reused that same ID for another effect.
 
-The trigger could then unintentionally PLAY or PAUSE the application's effect, making the FFB appear to stop working.
+In Condor, for example, that ID could become the main Spring effect.
 
-The artificial diagnostic kick was therefore removed completely.
+Pressing and releasing the trigger could then accidentally PLAY or PAUSE Condor's Spring and make the FFB appear to have died.
 
-### Reset and native auto-center
+The artificial kick was removed completely.
 
-A DirectInput device reset could cause the SideWinder's own native centering behavior to become active again.
+### Reset and auto-center
 
-The final firmware explicitly disables native auto-center after reset and includes a stabilization period before normal FFB communication resumes.
+A DirectInput reset could cause the SideWinder's own native centering force to become active again.
+
+The final firmware disables it again after reset and waits briefly for the joystick to stabilize before continuing normal FFB communication.
 
 ### USB / SideWinder communication
 
-Force Feedback communication is queued and asynchronous.
+FFB communication with the SideWinder is queued and asynchronous.
 
-USB HID processing therefore does not have to wait for the much slower physical SideWinder communication path.
+The USB side therefore does not have to stop and wait while commands are physically sent to the joystick.
 
-Logical SideWinder messages are also paced rather than being transmitted continuously back-to-back.
+SideWinder messages are also paced rather than sent continuously back-to-back. On the hardware tested here, this made a major improvement to stability.
 
-### Periodic effects and Spring response
+### Periodic effects and Spring
 
-Periodic-effect gain handling was corrected, making effects such as buffet and flutter clearly perceptible.
+Periodic-effect gain handling was corrected, which made effects such as stall buffet and flutter much easier to feel.
 
-The Spring response was also reshaped so that it no longer unnecessarily hides weaker dynamic effects while still retaining full force when required.
+The Spring response was also reshaped so it would not overpower the other effects at low and medium force levels, while still allowing full force when required.
 
 ---
 
 ## Input stability
 
-The SideWinder's original analog controls can exhibit small amounts of raw jitter.
+The original SideWinder controls have a small amount of raw jitter.
 
-Instead of applying one generic smoothing algorithm to every control, the final firmware uses specific strategies for:
+Instead of applying the same smoothing to every axis, the firmware uses different filtering for:
 
 * X / Y
 * throttle / slider
 * Rotation Z
 
-The result is stable joystick input without sacrificing useful range or introducing noticeable control latency.
+This keeps the controls stable without noticeably slowing them down or reducing their useful range.
 
-Validated USB input reporting is approximately **1 kHz**.
+USB input reporting in the final captures is approximately **1 kHz**.
 
 ---
 
@@ -216,17 +222,17 @@ local snapshot + axis filtering
         ↓
 USB HID
         ↓
-Windows
+Windows 10 / 11
 ```
 
 ### Force Feedback path
 
 ```text
-Windows / DirectInput PID
+Windows DirectInput PID
         ↓
-USB HID OUTPUT / FEATURE reports
+USB HID OUTPUT / FEATURE
         ↓
-Force Feedback translation
+FFB translation
         ↓
 non-blocking FIFO
         ↓
@@ -234,10 +240,8 @@ SideWinder message pacing
         ↓
 SideWinder protocol
         ↓
-physical joystick motors
+joystick motors
 ```
-
-The USB/HID path does not intentionally block while waiting for physical SideWinder communication.
 
 ---
 
@@ -248,135 +252,135 @@ Target hardware:
 * Microsoft **SideWinder Force Feedback Pro**
 * Gameport / DA-15 version
 * RP2040 or RP2040-Zero
-* appropriate DA-15 interface wiring
+* suitable DA-15 wiring
 * original or compatible SideWinder external power supply
 
-This project is specifically intended for the **Microsoft SideWinder Force Feedback Pro Gameport joystick**.
+This project is for the **SideWinder Force Feedback Pro Gameport version**.
 
-It is not intended for the later native-USB **SideWinder Force Feedback 2**, which does not require this type of Gameport-to-USB conversion.
+It is not intended for the later native-USB **SideWinder Force Feedback 2**, which does not need this type of Gameport-to-USB adapter.
 
-See the hardware documentation in this repository before wiring the adapter.
+Check the hardware documentation in this repository before wiring the adapter.
 
 ---
 
 ## Flashing
 
-The ready-to-use firmware is available from the **FINAL GitHub Release**.
+The ready-to-use firmware can be downloaded from the **FINAL GitHub Release**.
 
 To flash it manually:
 
 1. Connect the SideWinder / Gameport side of the adapter.
-2. Hold **BOOTSEL** while connecting the RP2040 / Pico to USB.
-3. The RP2040 should appear as a USB mass-storage drive.
+2. Hold **BOOTSEL** while connecting the RP2040 to USB.
+3. The RP2040 appears as a USB mass-storage drive.
 4. Copy:
 
    `firmware/PicoWinder_FFB_PRO_FINAL_A22.uf2`
 
    to the RP2040 drive.
 5. The board reboots automatically.
-6. Reconnect normally if necessary.
+6. Reconnect normally if needed.
 
-Windows should enumerate the USB Product String as:
+Windows 10/11 should enumerate the device as:
 
 **`Picowinder FFB PRO`**
 
-Windows can cache the friendly name of an existing USB device instance. Removing and re-enumerating the device can refresh the displayed name.
+Windows may keep an older cached device name. If that happens, removing the old device instance and reconnecting the adapter should refresh it.
 
 ### Firmware SHA-256
 
 `49279876c95b18d4316cdd96e057593b9fdb733f064c0650adf3d5b9416b8103`
 
-The public **FINAL** release corresponds internally to the validated **A22** development build.
+The public **FINAL** firmware corresponds internally to the validated **A22** development build.
 
 ---
 
-## Development and validation
+## How it was tested
 
-Development relied heavily on measurement and reproducible testing rather than trial-and-error tuning.
+A lot of the development work was based on captures and binary checks rather than simply changing code until the joystick "felt better".
 
-Tools and methods included:
+Tools used during development included:
 
-* real SideWinder hardware testing
-* generic DirectInput Force Feedback utilities
+* real SideWinder hardware
+* DirectInput FFB test utilities
 * Condor 3
 * USBPcap
-* Wireshark / USB packet analysis
+* Wireshark
 * ELF symbol inspection
-* linker-placement verification
+* linker-placement checks
 * disassembly
 * UF2 → RAW reconstruction
 * binary comparison
 * SHA-256 verification
 
-The fundamental development rule became:
+The basic rule became:
 
-**Change one variable at a time and verify it.**
+**Change one thing at a time and test it.**
 
-Several apparently reasonable firmware changes were rejected because testing showed regressions or because the original diagnosis proved incorrect.
+Several changes that looked sensible on paper were discarded because they caused regressions or because further testing showed that the original diagnosis was wrong.
 
 ---
 
-## Source structure
+## Source code
 
-The final firmware was developed incrementally through binary-audited wrappers and targeted patches.
+The final firmware was developed incrementally with wrappers and targeted binary patches.
 
-It was **not** produced from one monolithic edited C project.
+It was **not** built from one single edited C project.
 
-For transparency and reproducibility, this repository contains several complementary source paths.
+The repository therefore keeps several views of the source.
 
 ### `exact_rebuild/`
 
-Contains the material required to reproduce the exact physically validated FINAL firmware.
+Contains what is needed to reproduce the exact physically tested FINAL firmware.
 
-This is the authoritative path when binary reproducibility matters.
+Use this path when exact binary reproducibility matters.
 
 ### `source/history/`
 
-Contains the actual C, ASM, linker and Python artifacts produced throughout development.
+Contains the real C, ASM, linker and Python files created during development.
 
 ### `source/final_modules/`
 
-Contains the final logical firmware modules in a more readable form.
+Contains the final firmware logic split into readable modules.
 
 ### `source/clean_integrated_project/`
 
-Contains a maintainable integrated C-source reconstruction intended for future development.
+Contains a cleaner integrated C-source reconstruction intended as a starting point for future development.
 
-**Important:** firmware newly compiled from the clean integrated tree must be considered a new firmware build until it has been validated again on real hardware.
+A firmware compiled from this clean tree should be considered a **new firmware build** until it has been tested again on real hardware.
 
-It should not automatically be assumed to be binary- or behavior-identical to the validated FINAL firmware.
+It should not automatically be assumed to behave exactly like the validated FINAL release.
 
 ---
 
-## Development rule
+## A note for future development
 
-The current firmware is **FINAL because it works**.
+The current firmware is marked **FINAL because it works**.
 
-Do not casually modify or "clean up":
+Some parts may look tempting to simplify or rewrite, but many of them exist because a real problem was found during testing.
+
+In particular, be careful when changing:
 
 * SideWinder message pacing
 * reset timing
 * native auto-center handling
 * DirectInput / PID semantics
 * effect-table handling
-* periodic gain translation
+* periodic gain
 * Spring response
 * axis filters
 * USB/HID execution paths
 
-without first identifying a reproducible defect.
+If a new problem is found, the preferred approach is:
 
-Future changes should ideally include:
+1. reproduce it
+2. capture the USB traffic
+3. identify where it actually fails
+4. change one thing
+5. compare before and after
+6. verify the resulting binary
+7. test it on a real SideWinder
 
-1. reproduction of the problem
-2. USBPcap capture
-3. identification of the exact failure
-4. one controlled modification
-5. before/after comparison
-6. binary audit
-7. real SideWinder hardware testing
-
-A successful compile alone is **not** sufficient validation.
+A successful compile by itself does not mean the firmware is validated.
 
 ---
 
@@ -386,39 +390,37 @@ PicoWinder FFB PRO is based on the original **PicoWinder** project by **Nolan Ni
 
 https://github.com/NolanNicholson/picowinder
 
-The upstream project established the fundamental RP2040 hardware interface, SideWinder communication and USB HID / PID implementation on which this work is based.
+The original project provided the RP2040 hardware interface, SideWinder communication and USB HID / PID foundation used here.
 
-PicoWinder FFB PRO should therefore be understood as a **continuation and extensively debugged development of PicoWinder**, not as an unrelated project.
+PicoWinder FFB PRO is a continuation of that work, not an unrelated project.
 
-Full credit for the original PicoWinder work remains with Nolan Nicholson.
+Full credit for the original PicoWinder project remains with Nolan Nicholson.
 
 ---
 
 ## License
 
-The original PicoWinder project is distributed under the **GNU General Public License v3.0 (GPL-3.0)**.
+The original PicoWinder project is licensed under the **GNU General Public License v3.0 (GPL-3.0)**.
 
-This modified work is distributed under **GPL-3.0** as well.
+This modified project is distributed under **GPL-3.0** as well.
 
-When redistributing this project or derivatives, preserve the upstream attribution and comply with the GPL-3.0 license terms.
+Please preserve the upstream attribution and license when redistributing this project or modified versions of it.
 
 ---
 
-## Project status
+## Status
 
 ### FINAL
 
-The current validated firmware provides a practical way to use a **Microsoft SideWinder Force Feedback Pro Gameport joystick on a modern PC with real DirectInput Force Feedback**.
+The current firmware is the version I recommend for using a **Microsoft SideWinder Force Feedback Pro Gameport joystick on Windows 10/11 with DirectInput Force Feedback**.
 
-For the complete technical history and validation process, see:
+For the complete development history and technical details, see:
 
 * `docs/SOURCE_MAP.md`
 * `CHANGELOG.md`
 * `docs/MEGA_HANDOFF_FINAL_A22.txt`
 * `exact_rebuild/`
 * `source/history/`
-
-The current FINAL release remains recommended until a reproducible defect justifies further development.
 
 ---
 
