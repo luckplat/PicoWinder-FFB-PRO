@@ -1,0 +1,156 @@
+PicoWinder Condor FINAL A21 SPRING RESHAPE
+DEEP BINARY AUDIT
+============================================================
+
+BASE
+----
+User-supplied file:
+PicoWinder_Condor_FINAL_A20_AXIS_REFINEMENT(1).uf2
+
+A20 UF2 SHA256:
+a3556c05d7068d3646bc2eefdaa1b9d459b780d3298c9aa2b18ea4c9f87d1917
+
+Reconstructed A20 RAW SHA256:
+7fe42537aedc27e92d13b9547b9cd38f15109ddede8be8acabce014d35407291
+
+Both hashes exactly match the previously validated FINAL A20 release.
+
+CHANGE SCOPE
+------------
+The A20 spring LUT was found exactly ONCE in the reconstructed firmware.
+
+LUT flash offset:
+0x6C40
+
+LUT absolute address:
+0x10006C40
+
+Length:
+128 bytes
+
+A21 changes ONLY bytes inside:
+0x6C40 .. 0x6CBF
+
+Actual changed bytes:
+41 of 128 LUT entries
+
+First changed Spring index:
+85
+
+Last changed Spring index:
+125
+
+Every byte before the LUT:
+IDENTICAL TO A20
+
+Every byte after the LUT:
+IDENTICAL TO A20
+
+Only one UF2 256-byte payload block differs:
+flash page 0x10006C00..0x10006CFF
+
+NO EXECUTABLE CODE CHANGED.
+
+CURVE DESIGN
+------------
+A20:
+round(s*s/127)
+
+A21:
+- exactly A20 for s <= 82
+- smooth positive-only hardening above that point
+- maximum additional force = +16/127
+- peak region ~= s 110
+- smooth reconvergence to the same 127 maximum
+- A21 >= A20 for ALL 128 entries
+- monotonic 0..127
+- full maximum remains 127
+
+Selected values:
+
+ s   A20   A21   delta
+-----------------------
+  0    0     0    +0
+ 20    3     3    +0
+ 40   13    13    +0
+ 60   28    28    +0
+ 70   39    39    +0
+ 75   44    44    +0
+ 80   50    50    +0
+ 82   53    53    +0
+ 84   56    56    +0
+ 86   58    59    +1
+ 88   61    63    +2
+ 90   64    67    +3
+ 92   67    72    +5
+ 95   71    78    +7
+ 98   76    86   +10
+100   79    90   +11
+102   82    95   +13
+105   87   102   +15
+108   92   108   +16
+110   95   111   +16
+112   99   114   +15
+115  104   117   +13
+118  110   119    +9
+120  113   119    +6
+122  117   120    +3
+123  119   121    +2
+124  121   122    +1
+125  123   124    +1
+126  125   125    +0
+127  127   127    +0
+
+Interpretation:
+The low-speed/low-Spring region is intentionally NOT softened.
+The new curve begins by separating very gently from A20, becomes
+progressively firmer through the middle/upper Spring range, then
+smoothly approaches the same hardware maximum.
+
+IMPORTANT:
+The firmware receives Condor's Spring coefficient, NOT aircraft km/h.
+Therefore the desired aerodynamic "knee around 90-100 km/h" is
+implemented as a smooth reshape of the corresponding Spring region,
+not as a literal speed threshold.
+
+PRESERVED A20 FUNCTIONALITY
+---------------------------
+Because only LUT data changed, all of these are byte-identical to A20:
+
+- X/Y +/-4 filtering
+- Slider A20 idle-lock / tracking filter
+- Rotation Z wide center zone + LUT + slew
+- HID snapshot race fix
+- NO-KICK
+- Device Reset handling
+- 75 ms Reset guard
+- 1 ms logical-message pacing
+- effect-table byte ABI fix
+- Condition semantics
+- direct periodic gain fix
+- periodic/buffet/flutter path
+- trim / Spring center-offset handling
+- cleanup behavior
+- USB/input code
+
+UF2 VALIDATION
+--------------
+UF2 reconstructed independently back to RAW:
+EXACT byte-for-byte match.
+
+UF2 block count:
+113
+
+OUTPUT HASHES
+-------------
+A21 RAW SHA256:
+df4b129580a238a91a0c0b1f8ead90cfa8a610a58a4527633cbbad5a00c4cff8
+
+A21 UF2 SHA256:
+839644adea2fe951ea626ea32b2c415b5dcacd6da6651da15b143994a01ba297
+
+CONCLUSION
+----------
+A21 is a surgical force-curve tuning of the exact validated A20.
+It does not alter any code path or subsystem other than the 128-byte
+Spring transfer table.

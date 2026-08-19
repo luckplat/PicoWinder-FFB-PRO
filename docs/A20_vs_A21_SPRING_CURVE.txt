@@ -1,0 +1,42 @@
+PicoWinder Condor FINAL A21 - SPRING CURVE COMPARISON
+
+IMPORTANT:
+'s' is NOT km/h.
+It is the stock Spring strength entering the curve:
+positiveCoefficient >> 1, range 0..127.
+
+A20 is preserved exactly in the low zone.
+A21 only adds force, progressively and smoothly.
+
+ s   A20   A21   delta
+-----------------------
+  0    0     0    +0
+ 20    3     3    +0
+ 40   13    13    +0
+ 60   28    28    +0
+ 70   39    39    +0
+ 75   44    44    +0
+ 80   50    50    +0
+ 82   53    53    +0
+ 84   56    56    +0
+ 86   58    59    +1
+ 88   61    63    +2
+ 90   64    67    +3
+ 92   67    72    +5
+ 95   71    78    +7
+ 98   76    86   +10
+100   79    90   +11
+102   82    95   +13
+105   87   102   +15
+108   92   108   +16
+110   95   111   +16
+112   99   114   +15
+115  104   117   +13
+118  110   119    +9
+120  113   119    +6
+122  117   120    +3
+123  119   121    +2
+124  121   122    +1
+125  123   124    +1
+126  125   125    +0
+127  127   127    +0

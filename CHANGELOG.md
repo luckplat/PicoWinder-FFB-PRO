@@ -1,0 +1,21 @@
+# Version history
+
+- **A2 RESETFIX** — Device Reset followed by native auto-center OFF.
+- **A3 ABI_EFFECT_TABLE_FIX** — correct byte ABI for effect type table.
+- **A4 NONBLOCKING_DEFINE** — DEFINE moved out of blocking HID callback UART path.
+- **A5 HID_PID_HANDSHAKE** — experiment; regression; discarded.
+- **A6/A7 START tests** — proved START was not the primary failure.
+- **A8/A9** — invalid builds due linker/blob placement error; never use.
+- **A10 FIXED_HANDLER_REAL_START** — first genuinely good base.
+- **A11 RESET_GUARD** — 75 ms physical SideWinder reset stabilization.
+- **A12 MESSAGE_PACING** — 1 ms between complete logical messages; 75 ms after reset.
+- **A13 NO_KICK** — removed stale-ID trigger kick root cause.
+- **A14 PERIODIC_GAIN_FIX** — periodic gain passed directly instead of halved twice.
+- **A15 SPRING_CURVE** — progressive spring curve, better aerodynamic feel.
+- **A16 AXIS_HYSTERESIS** — X/Y jitter suppression.
+- **A17 SLIDER_HYSTERESIS** — first slider filter.
+- **AUDITED V2** — local HID snapshot fixes concurrency weakness.
+- **A19 TEMPORAL_AXIS_FILTER** — full slider range restored; first temporal Z filter.
+- **A20 AXIS_REFINEMENT** — final slider idle-lock/tracking and wide-deadzone smooth Z.
+- **A21 SPRING_RESHAPE** — final preferred Spring feel: low range preserved, mid/high progressively firmer.
+- **A22 DEVICE_NAME** — functionally A21, USB name changed to `Picowinder FFB PRO`. **Current definitive release.**

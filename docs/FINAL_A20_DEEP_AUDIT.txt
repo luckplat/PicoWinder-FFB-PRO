@@ -1,0 +1,119 @@
+PicoWinder Condor FINAL A20 — DEEP AUDIT
+
+BASE
+====
+Exact physically tested FW17 RAW SHA256:
+2cde9f1ed917511c97967913763e88f1996661ecc7b849aacac022239570fe64
+
+FINAL A20 RAW SHA256:
+7fe42537aedc27e92d13b9547b9cd38f15109ddede8be8acabce014d35407291
+
+FINAL A20 UF2 SHA256:
+a3556c05d7068d3646bc2eefdaa1b9d459b780d3298c9aa2b18ea4c9f87d1917
+
+A19 LOG FINDING — SLIDER
+========================
+From CONDOR_FINAl_A19.pcap:
+- initial reported value 13 is stable for ~59.6 s.
+- before the deliberate full-travel test, false plateaux appear between 10
+  and 18.
+- examples include value 15 lasting ~2.80 s and value 16 lasting ~1.53 s.
+
+Therefore some unwanted movement is not a short spike. A 6 ms temporal gate
+alone cannot distinguish it from a tiny deliberate movement.
+
+A20 SLIDER FILTER
+=================
+Idle:
+- +/-3 counts: hard hold.
+- displacement 4..7: 250-report confirmation.
+- displacement >=8: 6-report confirmation, then tracking.
+
+Tracking:
+- exact RAW output.
+- exits after a 100-report window whose raw span <=3.
+
+Offline model on the actual A19 log before t=85 s:
+- A19 reported changes: 68
+- A20 modeled changes: 0
+- A20 modeled value: 13 fixed
+
+During the deliberate 0..100% tests:
+- exact output minimum: 0
+- exact output maximum: 127
+- extra latency once raw reaches 0: 0.0 ms
+- extra latency once raw reaches 127: 0.0 ms
+
+ROTATION Z
+==========
+A19's temporal gate is removed from Z.
+
+Wide center-zero LUT:
+- raw 24..38 -> output 32
+- raw 0 -> output 0
+- raw 23 -> output 31
+- raw 39 -> output 33
+- raw 63 -> output 63
+
+Outside the center, both sides are monotonically remapped.
+
+A one-count-per-HID-report slew limiter is then applied.
+Thus no firmware-generated Z step can exceed 1 count.
+
+Current A19 log:
+- median non-zero Z step: 4.0
+- maximum non-zero Z step: 7
+
+Raw FW16 center segment modeled through A20:
+- output remains exactly 32 for the entire first 15 s.
+
+PERFORMANCE
+===========
+Z mapping uses a 64-byte LUT.
+There is NO integer division at runtime and no __aeabi_uidiv dependency.
+
+X/Y
+===
+Unchanged validated +/-4 tracking hysteresis.
+
+CONCURRENCY
+===========
+The audited race fix is retained:
+- global PIO IRQ report is read-only;
+- filtering uses private state;
+- a local 9-byte snapshot is sent to TinyUSB.
+
+FFB IDENTITY
+============
+Flash 0x10005900..0x10006DFF is byte-for-byte identical to tested FW17.
+
+Unchanged:
+- NO KICK
+- 75 ms Reset stabilization
+- 1 ms message pacing
+- effect-table ABI fix
+- periodic gain fix
+- progressive Spring curve
+- trim
+- buffeting
+- flutter
+- cleanup
+
+COMPILER / ANALYZER
+===================
+Strict compile with -Wall/-Wextra/.../-Werror:
+0 warnings.
+
+Clang static analyzer:
+0 findings.
+
+BINARY / UF2
+============
+Input handler symbol: 0x10006E19
+Actual code address:   0x10006E18
+Module size:           584 bytes
+Final flash length:    28928 bytes
+UF2 blocks:            113
+
+Independent UF2 -> RAW reconstruction:
+exact byte-for-byte match.

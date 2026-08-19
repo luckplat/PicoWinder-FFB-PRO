@@ -1,0 +1,1646 @@
+================================================================================
+MICROSOFT SIDEWINDER FORCE FEEDBACK PRO GAMEPORT -> USB / RP2040
+PICOWINDER + CONDOR 3
+MEGA HANDOFF TECNICO + BASE DOCUMENTAZIONE GITHUB
+STATO FINALE: A20 / FINAL RELEASE
+Data: 14 agosto 2026
+================================================================================
+
+SCOPO DI QUESTO FILE
+====================
+
+Questo documento è stato scritto con due scopi contemporaneamente:
+
+1) HANDOFF PER UNA FUTURA CHAT CHATGPT
+--------------------------------------
+Se questo file viene caricato in una nuova conversazione, la nuova chat deve
+considerarlo come il riassunto tecnico completo del progetto e NON deve
+ripartire da zero, riproporre tentativi già fatti o modificare a caso parti
+che sono già state validate.
+
+Il punto di partenza corretto, in caso di prosecuzione, è:
+
+    FINAL A20 = firmware finale/golden attualmente validato
+
+Pacchetto sorgente già scaricato dall'utente:
+
+    PicoWinder_Condor_FINAL_A20_AXIS_REFINEMENT_source_and_firmware.zip
+
+Firmware finale:
+
+    PicoWinder_Condor_FINAL_A20_AXIS_REFINEMENT.uf2
+
+SHA-256 UF2:
+
+    a3556c05d7068d3646bc2eefdaa1b9d459b780d3298c9aa2b18ea4c9f87d1917
+
+RAW SHA-256:
+
+    7fe42537aedc27e92d13b9547b9cd38f15109ddede8be8acabce014d35407291
+
+2) DOCUMENTAZIONE TECNICA PER GITHUB
+------------------------------------
+Questo file può essere usato come base per un README lungo, una pagina di
+documentazione, una release note o un "project history" su GitHub.
+
+Il progetto deriva dal lavoro originale PicoWinder di Nolan Nicholson
+(repository upstream: github.com/NolanNicholson/picowinder) ed eredita la
+licenza GPL-3.0. Nel pacchetto finale A20 è inclusa la relativa licenza.
+
+IMPORTANTE:
+Il firmware finale NON è un semplice fork "ricompilato": contiene una lunga
+serie di correzioni diagnostiche, stabilizzazioni del trasporto FFB, fix di
+traduzione DirectInput/PID -> protocollo SideWinder e filtri assi specifici
+validati sperimentalmente con USBPcap e Condor 3.
+
+
+================================================================================
+1. OBIETTIVO DEL PROGETTO
+================================================================================
+
+Obiettivo: utilizzare un Microsoft SideWinder Force Feedback Pro GAMEPORT
+(DA15) su Windows 10/11 tramite RP2040, presentandolo come joystick USB HID
+con Force Feedback DirectInput/PID realmente funzionante in Condor 3.
+
+Non bastava:
+
+- avere assi e pulsanti funzionanti;
+- avere una semplice molla di centraggio;
+- avere un dispositivo visto da Windows come FFB.
+
+L'obiettivo reale era ottenere in Condor 3:
+
+- forza barra dipendente dalla velocità;
+- trim percepibile come spostamento del punto di equilibrio;
+- buffeting / pre-stall vibration;
+- flutter;
+- stabilità completa di assi e FFB;
+- nessun blocco dopo pochi secondi;
+- nessuna molla residua dopo l'uscita da Condor;
+- input assi puliti e senza jitter evidente.
+
+
+================================================================================
+2. HARDWARE USATO
+================================================================================
+
+Joystick:
+    Microsoft SideWinder Force Feedback Pro GAMEPORT
+
+Adattatore:
+    RP2040 / RP2040-Zero
+    progetto PicoWinder
+
+Collegamento:
+    connettore DB15 gameport -> RP2040
+    SideWinder alimentato correttamente
+    resistenze previste dal progetto/adattamento già montate
+
+Componenti citati durante il progetto:
+    - RP2040-Zero
+    - DB15
+    - resistenze 220 ohm
+    - resistenze 2.2 kohm
+    - cavetti/jumper
+    - alimentatore originale/compatibile SideWinder
+
+NOTA:
+Questo handoff NON ricostruisce da memoria il pinout completo DB15/RP2040,
+per evitare di introdurre errori. Per il cablaggio usare la documentazione
+hardware già realizzata, il repository PicoWinder e/o i file sorgente finali.
+
+
+================================================================================
+3. SOFTWARE / AMBIENTE DI TEST
+================================================================================
+
+Sistema operativo:
+    Windows 10/11
+
+Simulatori / programmi principali:
+    - Condor 3
+    - ForceTest / DirectInput test utilities
+    - simFFB
+    - USBPcap
+    - Wireshark / analisi PCAP
+
+Condor:
+    versione usata durante i test: Condor 3.x
+    nel percorso di sviluppo è stata citata 3.1.0
+
+Repository base:
+    PicoWinder
+    github.com/NolanNicholson/picowinder
+
+Riferimento tecnico importante:
+    adapt-ffb-joy
+    usato come esempio maturo di implementazione completa SideWinder FFB.
+
+Baud/protocollo SideWinder:
+    circa 31.250 baud
+    protocollo MIDI-like proprietario SideWinder FFB.
+
+
+================================================================================
+4. PROBLEMA INIZIALE
+================================================================================
+
+Firmware PicoWinder originale / prime build:
+
+- joystick USB riconosciuto;
+- assi e pulsanti funzionanti;
+- Windows vedeva il device come FFB;
+- in Condor 3 il FFB apparentemente partiva;
+- dopo circa 5-10 secondi potevano bloccarsi assi + FFB;
+- spesso rimaneva una molla/centraggio dopo l'uscita;
+- il comportamento percepito era quasi solo una molla di centraggio;
+- non si sentivano chiaramente velocità, stallo, flutter, trim;
+- un "kick" artificiale sul trigger era usato come test.
+
+ForceTest indicava diversi effetti supportati:
+
+    ConstantForce
+    Ramp
+    Square
+    Sine
+    Triangle
+    Sawtooth Up/Down
+    Spring
+    Damper
+    Inertia
+    Friction
+
+ma in alcune fasi falliva la creazione o l'esecuzione corretta.
+
+
+================================================================================
+5. SCOPERTA FONDAMENTALE N.1: RESET E AUTOCENTER NATIVO
+================================================================================
+
+Firmware A2_RESETFIX
+--------------------
+
+Scoperta:
+un Device Reset DirectInput/PID faceva riattivare il centering/autocenter
+nativo del SideWinder.
+
+Fix:
+dopo Reset veniva inviato anche il comando per disabilitare nuovamente
+l'autocenter nativo.
+
+Effetto:
+la "molla dura" residua che rimaneva dopo certi reset sparì.
+
+Conclusione:
+la molla residua NON era necessariamente un effetto Condor non liberato:
+era il comportamento nativo SideWinder riabilitato dal Reset.
+
+Questa scoperta rimane valida nel firmware finale.
+
+
+================================================================================
+6. SCOPERTA N.2: ABI / EFFECT TABLE
+================================================================================
+
+Firmware A3_ABI_EFFECT_TABLE_FIX
+--------------------------------
+
+Problema:
+effects_assigned[] era stato interpretato con una dimensione/tipo errato
+(uint32_t*) invece di accesso byte.
+
+Fix:
+corretto accesso byte alla tabella degli effetti.
+
+Importanza:
+senza questa correzione, la logica che decideva il tipo di effetto fisico
+associato a un ID DirectInput poteva leggere dati errati.
+
+
+================================================================================
+7. SCOPERTA N.3: NON BLOCCARE IL CALLBACK HID
+================================================================================
+
+A4_NONBLOCKING_DEFINE
+---------------------
+
+Problema:
+CreateNewEffect / DEFINE poteva scrivere direttamente sulla UART SideWinder
+durante callback HID FEATURE/OUTPUT.
+
+Questo poteva introdurre latenze/blocchi in una zona USB critica.
+
+Fix:
+passaggio a coda/FIFO e invio asincrono/non bloccante.
+
+Questo concetto rimane fondamentale nella versione finale:
+la parte USB/HID non deve aspettare fisicamente il SideWinder.
+
+
+================================================================================
+8. A5: TENTATIVO HANDSHAKE PID - SCARTATO
+================================================================================
+
+A5_HID_PID_HANDSHAKE
+--------------------
+
+Tentativo:
+aggiunta di PID State / PID Pool più articolati.
+
+Risultato:
+regressione DirectInput.
+
+Decisione:
+SCARTATO.
+Non usare A5 come base.
+
+
+================================================================================
+9. A6 / A7: START NON ERA LA CAUSA
+================================================================================
+
+A6_SYNC_START
+-------------
+
+Si sospettava che il primo Effect Operation START fisico provocasse il
+collasso FFB.
+
+A7_START_BYPASS
+---------------
+
+Test mirato:
+soppressione del START fisico.
+
+Risultato:
+il problema poteva ancora verificarsi.
+
+Conclusione:
+START NON era la causa primaria.
+
+Questa fase è importante perché ha evitato di costruire un workaround
+sbagliato basato sulla rimozione dello START.
+
+
+================================================================================
+10. A8 / A9: BUILD INVALIDI - LEZIONE CRITICA
+================================================================================
+
+A8_STOCK_CONDITION
+A9_REAL_START
+
+Queste build NON sono valide come riferimento tecnico.
+
+Errore:
+il linker posizionava la sezione wrapper a:
+
+    0x10006500
+
+e il simbolo handler reale era:
+
+    0x10006510
+
+ma il blob objcopy era stato inserito nel firmware a 0x10006510 anziché alla
+BASE DI SEZIONE 0x10006500.
+
+Risultato:
+il branch poteva entrare in literal/data invece che nel codice corretto.
+
+LEZIONE:
+da questo momento ogni firmware deve essere auditato così:
+
+    sorgente
+      -> compile
+      -> simboli
+      -> indirizzi
+      -> disassembly
+      -> placement del blob
+      -> confronto delta vs base
+      -> RAW
+      -> UF2
+      -> ricostruzione UF2 -> RAW
+      -> hash finale
+
+NON consegnare una build se uno di questi controlli fallisce.
+
+
+================================================================================
+11. A10: PRIMA BASE VERAMENTE BUONA
+================================================================================
+
+A10_FIXED_HANDLER_REAL_START
+----------------------------
+
+Prima build realmente corretta dopo gli errori A8/A9.
+
+Caratteristiche:
+- handler posizionato correttamente;
+- condition semantics ripristinate in stile stock;
+- real START mantenuto;
+- ForceTest finalmente funzionante con tutti i test;
+- simFFB funzionante;
+- Condor con assi fluidi;
+- FFB presente ma ancora percepito soprattutto come centering.
+
+A10 è la vera base tecnica da cui partono le versioni mature.
+
+Condition semantics A10:
+- X:
+    OFFSET_X(center_point_offset)
+    STRENGTH_X(positiveCoefficient >> 1)
+- Y:
+    analogo
+- niente reinterpretazione signed errata del coefficiente positivo;
+- niente gain multiplication aggiuntiva;
+- niente inversione arbitraria del centro Y.
+
+
+================================================================================
+12. ANALISI PCAP A10: CONDOR GENERA DAVVERO EFFETTI DINAMICI
+================================================================================
+
+Il PCAP di Condor mostrò chiaramente:
+
+- Spring ID 2
+- Triangle ID 3
+- Triangle ID 4
+
+Spring:
+    aggiornamenti circa ogni 51 ms (~19.5 Hz)
+
+Periodic:
+    aggiornamenti interleaved ogni ~12-13 ms complessivi
+    e SetEffect tipicamente circa ogni 50 ms per effetto.
+
+Esempi:
+    Triangle ID3:
+        magnitude 255
+        period ~158 ms (~6.3 Hz)
+        direction 0°
+
+    Triangle ID4:
+        magnitude ~181
+        period ~205 ms (~4.9 Hz)
+        direction 90°
+
+Conclusione:
+Condor NON stava mandando solo una molla.
+Il firmware stava ricevendo:
+- Spring dinamica
+- periodic/triangle
+- variazioni gain
+- START reali
+
+Il problema era nella traduzione / stabilità / bilanciamento.
+
+
+================================================================================
+13. A11: RESET GUARD 75 ms
+================================================================================
+
+A11_RESET_GUARD
+---------------
+
+Riferimento importante da adapt-ffb-joy:
+dopo Reset il SideWinder necessita di una fase di stabilizzazione.
+
+Fix:
+guard asincrono di circa 75 ms dopo SideWinder RESET.
+
+Risultato:
+grande aumento della stabilità.
+Numerosi avvii Condor consecutivi senza freeze.
+
+Rimanevano:
+- qualche anomalia FFB occasionale;
+- possibile burst di messaggi accumulati dopo il guard;
+- residui percepiti in alcune situazioni.
+
+
+================================================================================
+14. A12: MESSAGE PACING
+================================================================================
+
+A12_MESSAGE_PACING
+------------------
+
+A11 + pacing logico dei messaggi SideWinder.
+
+Regole:
+- C5 xx                 -> messaggio 2 byte
+- B5 xx id              -> 3 byte
+- B5 xx id A5 lo hi     -> 6 byte
+- F0 ... F7             -> SysEx completo variabile
+
+Dopo ogni messaggio completo:
+    attesa asincrona 1 ms
+
+Eccezione:
+    C5 01 RESET -> 75 ms
+
+IMPORTANTE:
+nessuna pausa intra-message.
+La pausa è solo dopo il messaggio logico completo.
+
+Questo fu un passaggio decisivo per la stabilità.
+
+NOTA SCIENTIFICA:
+non è mai stato dimostrato che 1 ms sia una specifica ufficiale obbligatoria
+del SideWinder. È un pacing diagnostico/empirico che nel nostro hardware ha
+dato stabilità eccellente.
+
+Non rimuoverlo senza una ragione concreta.
+
+
+================================================================================
+15. SCOPERTA PIÙ IMPORTANTE: IL KICK ERA LA CAUSA DEL BLOCCO FFB
+================================================================================
+
+Durante A12 l'utente osservò:
+
+    "Se non premo il pulsante del kick, il FFB non si blocca mai."
+
+Analisi del firmware:
+il kick artificiale veniva definito localmente all'avvio e occupava ID 2.
+
+Dopo un Device Reset:
+- gli effetti fisici SideWinder vengono liberati/reset;
+- ma la variabile locale effect_id_kickback rimane numericamente = 2.
+
+Condor, subito dopo Reset:
+- crea Spring -> ID 2
+- crea Triangle -> ID 3
+- crea Triangle -> ID 4
+
+Quando l'utente premeva il trigger:
+    ffb_midi_play(effect_id_kickback)
+    -> B5 20 02
+
+Quando lo rilasciava:
+    ffb_midi_pause(effect_id_kickback)
+    -> B5 30 02
+
+MA A QUEL PUNTO ID2 NON ERA PIÙ IL KICK:
+era la SPRING DI CONDOR.
+
+Quindi il trigger locale comandava per errore la Spring di Condor.
+
+Peggio:
+Condor aveva fatto START alla Spring solo in inizializzazione e poi
+continuava a modificarne i parametri, ma dopo il PAUSE locale non la
+riavviava necessariamente.
+
+Risultato percepito:
+"il FFB è morto".
+
+Questa spiegazione fu confermata indirettamente in PCAP:
+
+- Spring ID2 creata e START correttamente;
+- trigger premuto/rilasciato;
+- dopo il release, Condor continua a mandare centinaia di SetCondition;
+- ZERO nuovo START ID2;
+- quindi la Spring fisica poteva restare in pausa.
+
+Questo spiega anche perché storicamente il "kick" spariva dopo Condor:
+il vero kick era stato cancellato dal Reset, ma la variabile locale restava.
+
+Conclusione:
+il kick era una feature diagnostica e andava rimosso completamente.
+
+
+================================================================================
+16. A13: NO KICK
+================================================================================
+
+A13_NO_KICK
+-----------
+
+Base:
+A12 esatto.
+
+Modifica:
+rimossi i tre call-site del kick:
+
+- DEFINE kick
+- PLAY kick
+- PAUSE kick
+
+Il trigger resta comunque normale pulsante USB.
+
+Risultato:
+- nessun blocco FFB premendo il trigger;
+- nessuna molla residua dopo Condor;
+- stabilità finalmente solida.
+
+A13 chiude il capitolo "freeze causato dal kick".
+
+
+================================================================================
+17. A14: PERIODIC GAIN FIX
+================================================================================
+
+Problema trovato:
+nel motore derivato A1/A10 il gain degli effetti waveform veniva trasformato:
+
+    gain >> 1
+
+Ma il descriptor HID PicoWinder usava già gain 0..127.
+
+Quindi era una doppia attenuazione.
+
+Esempio:
+    Condor gain 92
+    firmware -> 46
+
+Fix A14:
+    MODIFY_GAIN = gain
+non:
+    gain >> 1
+
+Patch minima:
+    A13:
+        LSRS r2,r0,#1
+
+    A14:
+        MOV r2,r0
+
+Risultato:
+- periodic/triangle molto più percepibili;
+- buffeting vicino allo stallo finalmente evidente;
+- flutter più netto.
+
+Questa correzione è parte del firmware finale.
+
+
+================================================================================
+18. A15: CURVA SPRING PROGRESSIVA
+================================================================================
+
+Problema:
+la Spring era troppo forte e copriva gli altri effetti.
+
+Dal PCAP:
+la Spring SideWinder stava spesso nella parte alta della scala, talvolta
+molto vicina a 127/127.
+
+Non si voleva ridurre tutto con un semplice moltiplicatore fisso, perché
+l'utente voleva:
+
+- barra morbida a bassa velocità;
+- incremento naturale con la velocità;
+- piena forza disponibile ad alta velocità.
+
+A15 introdusse:
+
+    s_new = round(s^2 / 127)
+
+dove s era già lo stock-style:
+
+    positiveCoefficient >> 1
+
+Esempi:
+
+    A14 -> A15
+     66 -> 34
+     77 -> 47
+     83 -> 54
+    100 -> 79
+    110 -> 95
+    120 -> 113
+    127 -> 127
+
+IMPORTANTE:
+la curva viene applicata solo agli effetti realmente identificati come
+MIDI_SPRING.
+
+Damper / Inertia / Friction non vengono alterati.
+
+Risultato percepito:
+- forza barra molto più naturale;
+- variazione con velocità evidente;
+- buffeting molto più distinguibile;
+- trim percepibile;
+- flutter ancora forte;
+- massimo 127 ancora disponibile.
+
+A15 è la taratura FFB finale rimasta anche in A20.
+
+
+================================================================================
+19. IL "BUCO" FFB DI 0.5-1 s
+================================================================================
+
+L'utente percepì occasionalmente un piccolo "vuoto" di FFB, soprattutto
+nei primi secondi di Condor.
+
+Analisi PCAP:
+- nessuna perdita USB di 0.5-1 s;
+- assi continuavano a circa 1 kHz;
+- FFB aggiornato circa ogni 50 ms;
+- nessuna coda o starvation evidente.
+
+Si trovarono invece:
+- transitori iniziali Condor con intervalli FFB più lunghi;
+- momenti in cui Spring e periodic scendevano simultaneamente molto;
+- in alcune sequenze iniziali Condor impiegava 0.2-1.4 s a far salire il gain
+  dei periodic.
+
+Conclusione:
+il "vuoto" iniziale è molto probabilmente un transitorio di Condor / livello
+di forza realmente basso, NON una perdita di dati del firmware.
+
+Non sono state introdotte correzioni artificiali per questo fenomeno.
+
+
+================================================================================
+20. A16: FILTRO X/Y
+================================================================================
+
+Problema:
+il joystick virtuale di Condor vibrava leggermente anche a stick fermo.
+
+PCAP:
+X mostrava piccoli cambi di circa 4-6 conteggi su 0..1023.
+Y in alcuni tratti era più stabile.
+
+PicoWinder passava gli assi quasi raw al report USB.
+
+A16:
+tracking hysteresis X/Y +/-4 conteggi.
+
+Nessuna media temporale.
+
+Principio:
+- se raw resta entro +/-4 -> mantieni output;
+- se esce -> output segue restando al massimo 4 conteggi dal raw.
+
+Risultato:
+- jitter visivo X/Y praticamente eliminato;
+- nessuna latenza percepibile;
+- joystick virtuale Condor stabile.
+
+Questo filtro X/Y rimane in A20.
+
+
+================================================================================
+21. A17: PRIMO FILTRO SLIDER
+================================================================================
+
+Windows chiama il throttle/slider della base:
+
+    "Indicatore scorrevole"
+
+Report PicoWinder:
+- X/Y = 10 bit
+- twist/Z = 6 bit
+- throttle/slider = 7 bit (0..127)
+
+FW16 PCAP:
+slider fermo oscillava tipicamente:
+
+    24 <-> 26
+
+circa 63 cambi al secondo.
+
+A17:
+tracking hysteresis slider +/-1.
+
+Risultato:
+migliore, ma non perfetto.
+
+
+================================================================================
+22. PRIME "FINAL" E DOPPIO AUDIT
+================================================================================
+
+Fu preparata una prima FINAL con slider +/-2.
+
+Durante un doppio audit molto approfondito fu individuata una piccola
+race condition nel filtro input:
+
+Il wrapper filtrava modificando direttamente il buffer report globale,
+mentre l'IRQ PIO del SideWinder poteva aggiornarlo contemporaneamente.
+
+Non era stata dimostrata come causa di un malfunzionamento osservato,
+ma era una debolezza reale.
+
+CORREZIONE:
+da quel momento:
+
+    IRQ PIO -> report globale RAW
+                   |
+                   v
+             snapshot locale
+                   |
+                   v
+                 filtro
+                   |
+                   v
+               TinyUSB
+
+Il filtro NON scrive più nel buffer globale posseduto dall'IRQ.
+
+Questa correzione di concorrenza è mantenuta in A19 e A20.
+
+Audit eseguiti:
+- compilazione -Wall/-Wextra/.../-Werror;
+- 0 warning;
+- Clang static analyzer;
+- 0 findings;
+- placement ELF;
+- branch target;
+- memory map;
+- UF2 -> RAW;
+- rebuild indipendente;
+- confronto byte-per-byte.
+
+
+================================================================================
+23. A19: TEMPORAL AXIS FILTER
+================================================================================
+
+Il tracking hysteresis dello slider aveva un difetto intrinseco:
+mangiava corsa.
+
+Esempio:
+se il raw sale a 127 con band 2, il filtro poteva mantenere circa 125.
+
+Quindi l'utente vedeva massimo ~97%.
+
+A19 sostituì il filtro slider con un temporal gate:
+
+- band +/-2;
+- accetta una variazione solo dopo 6 report nella stessa direzione;
+- quando la accetta, passa il RAW esatto;
+- quindi 0 e 127 tornano possibili.
+
+Test offline sul PCAP raw FW16:
+
+primi 15 s:
+    RAW slider 24..26
+    943 cambi
+
+modello A19:
+    26 fisso
+    0 cambi
+
+Corsa completa:
+    0..127 preservata.
+
+A19 applicò un temporal gate simile anche a Z.
+
+Risultato:
+slider molto migliorato;
+Z però diventava visivamente "a gradini".
+
+
+================================================================================
+24. A20: FILTRI ASSI FINALI
+================================================================================
+
+A20 = RELEASE FINALE ATTUALE.
+
+Motivazione:
+PCAP A19 mostrava che alcuni falsi movimenti slider NON erano spike brevi.
+Comparivano plateau falsi da 1.5-2.8 secondi.
+
+Quindi un semplice gate temporale da ~6 ms non poteva distinguerli da un
+piccolo movimento reale.
+
+A20 usa filtri diversi per slider e Z.
+
+
+--------------------------------------------------------------------------------
+24.1 SLIDER / "INDICATORE SCORREVOLE"
+--------------------------------------------------------------------------------
+
+Filtro stateful idle-lock + tracking.
+
+A riposo:
+    +/-3 conteggi -> ignorati completamente
+
+Movimento medio:
+    delta 4..7 -> deve persistere 250 report (~250 ms)
+
+Movimento reale evidente:
+    delta >=8 -> conferma circa 6 report (~6 ms)
+    poi entra in TRACKING
+
+Durante TRACKING:
+    output = RAW esatto
+
+Quindi:
+- nessuna sottrazione permanente;
+- 0 e 127 sono preservati;
+- niente movimento a scalini durante una vera escursione.
+
+Tracking termina dopo una finestra di 100 report la cui escursione raw è <=3.
+
+Test offline sul PCAP A19:
+prima del vero test:
+
+    A19: 68 cambi indesiderati
+    modello A20: 0 cambi
+
+Durante le escursioni deliberate:
+    min = 0
+    max = 127
+
+
+--------------------------------------------------------------------------------
+24.2 ROTAZIONE Z / TWIST
+--------------------------------------------------------------------------------
+
+A19 venne giudicato troppo "a gradini".
+
+Nel PCAP A19:
+    step mediano non-zero ~4 conteggi
+    massimo osservato ~7
+
+A20:
+rimosso temporal gate su Z.
+
+Nuova trasformazione:
+
+    raw Z 24..38 -> centro output 32
+
+Questa è una zona di centro-zero volutamente ampia.
+
+Fuori dal centro:
+rimappatura monotona tramite LUT da 64 byte.
+
+Punti principali:
+
+    raw 0  -> output 0
+    raw 23 -> output 31
+    raw 24..38 -> output 32
+    raw 39 -> output 33
+    raw 63 -> output 63
+
+Poi:
+slew limiter massimo +/-1 conteggio per report HID.
+
+Quindi il firmware non può più generare salti:
+
+    31 -> 35
+
+ma deve fare:
+
+    31 -> 32 -> 33 -> 34 -> 35
+
+A circa 1 kHz la transizione resta fluida.
+
+Per performance:
+la mappatura Z usa LUT, nessuna divisione runtime / __aeabi_uidiv.
+
+
+================================================================================
+25. TEST FINALE A20: CONDOR_TEST_FW20.pcap
+================================================================================
+
+Questa cattura è il riferimento finale.
+
+Durata circa:
+    282 s
+
+Report joystick:
+    ~282.207
+
+Periodo medio:
+    ~1.000096 ms
+
+Frequenza:
+    praticamente 1 kHz
+
+Gap massimo input:
+    ~1.34 ms
+
+Conclusione:
+nessuna latenza/coda anomala introdotta dai filtri finali.
+
+
+--------------------------------------------------------------------------------
+25.1 SLIDER A20
+--------------------------------------------------------------------------------
+
+Nella cattura:
+per oltre 172 s resta esattamente fermo a un valore stabile senza movimenti
+spuri.
+
+Poi viene mosso realmente e raggiunge:
+
+    127/127
+
+e mantiene plateau stabili.
+
+Il test specifico del minimo 0 non era stato ancora eseguito in quell'ultimo
+PCAP, ma l'utente ha deciso:
+
+    se non viene segnalato un problema, considerare lo 0 funzionante.
+
+Quindi, salvo nuova segnalazione:
+slider A20 = VALIDATO.
+
+
+--------------------------------------------------------------------------------
+25.2 Z A20
+--------------------------------------------------------------------------------
+
+Nei primi ~69.8 s:
+    Z = 32 fisso
+    nessuna variazione
+
+Durante uso reale:
+    raggiunge 0 e 63.
+
+Analizzati migliaia di cambi:
+    passo massimo = 1 conteggio
+
+Quindi:
+- zona morta centrale funziona;
+- full range funziona;
+- slew limiter funziona;
+- nessun salto multi-count.
+
+
+--------------------------------------------------------------------------------
+25.3 X/Y A20
+--------------------------------------------------------------------------------
+
+Nessuna regressione.
+
+Joystick virtuale Condor:
+jitter evidente risolto.
+
+X/Y mantengono il filtro +/-4 già validato.
+
+
+================================================================================
+26. FFB NEL TEST FINALE A20
+================================================================================
+
+Inizializzazione Condor:
+circa t=61.5 s
+
+Sequenza:
+    Device Reset
+    Stop All
+    Device Gain
+    Create Spring
+    Create Triangle 3
+    Create Triangle 4
+
+Allocazioni:
+    ID2 = Spring
+    ID3 = Triangle
+    ID4 = Triangle
+
+BlockLoad:
+    successo
+
+START:
+    Spring ID2
+    Triangle ID3
+    Triangle ID4
+
+Durante il volo:
+- nessun Reset inatteso;
+- nessun Free inatteso;
+- nessuna ricreazione anomala;
+- nessun freeze;
+- nessun blocco input.
+
+Aggiornamenti:
+circa ogni 50 ms (~20 Hz) per i parametri principali.
+
+USB:
+centinaia di migliaia di pacchetti
+nessun errore USB rilevato nella sessione finale.
+
+
+================================================================================
+27. SPRING / VELOCITÀ
+================================================================================
+
+La curva finale A15 rimane in A20.
+
+Range Spring osservato nel test finale:
+grossomodo da zona medio-bassa fino a 127.
+
+Distribuzione indicativa finale:
+- mediana ~84/127
+- media ~86.6/127
+- >=100 solo ~18% del tempo
+- 127 pieno ~5% del tempo
+
+Questo è il comportamento desiderato:
+- bassa velocità -> barra più morbida;
+- alta velocità -> barra dura;
+- massimo pieno ancora disponibile.
+
+L'utente ha dichiarato la curva soddisfacente.
+
+
+================================================================================
+28. TRIM
+================================================================================
+
+Il trim è ora chiaramente percepibile.
+
+Nel PCAP finale il centro della Spring si sposta con il trim.
+
+Durante un tratto di prova:
+il centro Spring segue quasi linearmente il comando trim.
+
+Relazione osservata approssimativamente:
+
+    centro ≈ slider - 64
+
+con correlazione molto alta.
+
+Conclusione:
+il trim non è simulato con una semplice variazione di forza:
+Condor sta realmente spostando il punto di equilibrio e il firmware lo
+trasferisce al SideWinder.
+
+
+================================================================================
+29. BUFFETING / STALLO
+================================================================================
+
+Nel PCAP finale si osservano raffiche di Triangle moderati mentre la Spring
+è relativamente bassa.
+
+Questo corrisponde molto bene al buffeting percepito vicino allo stallo.
+
+Dopo A14/A15 l'utente ha riportato:
+- buffeting finalmente evidente;
+- molto più distinguibile dalla Spring.
+
+Quindi:
+buffeting = VALIDATO.
+
+
+================================================================================
+30. FLUTTER
+================================================================================
+
+Nel finale dei test precedenti e in A20:
+i periodic possono salire fino a 127/127 per alcuni secondi.
+
+Questo corrisponde al flutter percepito ad alta velocità.
+
+Il flutter è stato provato ripetutamente e considerato funzionante.
+
+Quindi:
+flutter = VALIDATO.
+
+
+================================================================================
+31. CLEANUP USCITA CONDOR
+================================================================================
+
+Nel test finale:
+Condor chiude ordinatamente gli effetti:
+
+    STOP 2
+    FREE 2
+    STOP 3
+    FREE 3
+    STOP 4
+    FREE 4
+    RESET
+
+Dopo l'uscita:
+- nessuna molla residua;
+- nessun FFB "incollato";
+- assi normali.
+
+Questo è un miglioramento fondamentale rispetto alle prime versioni.
+
+
+================================================================================
+32. STATO FINALE FUNZIONALE
+================================================================================
+
+A20 oggi è considerato "GOLDEN / FINAL".
+
+FUNZIONA:
+
+[OK] USB HID joystick
+[OK] X
+[OK] Y
+[OK] pulsanti
+[OK] trigger
+[OK] throttle / Indicatore scorrevole
+[OK] Rotation Z / twist
+[OK] input ~1 kHz
+[OK] jitter X/Y eliminato
+[OK] jitter slider sostanzialmente eliminato
+[OK] zona morta Z
+[OK] movimento Z fluido max 1 step/report
+[OK] Force Feedback stabile
+[OK] no freeze Condor
+[OK] no artificial kick
+[OK] no molla residua
+[OK] speed-dependent stick force
+[OK] trim
+[OK] buffeting
+[OK] flutter
+[OK] cleanup Condor
+[OK] ForceTest / effetti generali funzionanti nelle basi mature
+[OK] pacing SideWinder
+[OK] Reset stabilization
+
+
+================================================================================
+33. COSA NON MODIFICARE SENZA UN DIFETTO CONCRETO
+================================================================================
+
+Questa sezione è importantissima per una futura chat.
+
+NON proporre "ottimizzazioni" casuali a:
+
+1) pacing 1 ms
+2) Reset guard 75 ms
+3) no-kick
+4) periodic gain diretto
+5) Spring curve A15
+6) condition semantics A10
+7) effect table byte ABI
+8) branch/handler placement
+9) snapshot locale input / race fix
+10) filtro X/Y +/-4
+11) slider state machine A20
+12) Z LUT + center zone + slew
+
+Motivo:
+tutte queste parti sono nate da un problema reale e sono state validate con
+test/PCAP.
+
+Una "pulizia" aggressiva o una riscrittura totale del firmware potrebbe
+reintrodurre bug senza portare alcun vantaggio percepibile.
+
+Se si vuole rifattorizzare il codice per GitHub:
+farlo SOLO con:
+- build riproducibile;
+- confronto funzionale;
+- PCAP A/B;
+- disassembly;
+- hash;
+- test Condor reale.
+
+
+================================================================================
+34. REGOLE DI BUILD / AUDIT DA MANTENERE
+================================================================================
+
+Ogni futura build deve avere:
+
+1. base firmware esplicitamente identificata;
+2. SHA base verificato;
+3. sorgente compilato;
+4. warning strict;
+5. static analyzer;
+6. simboli ELF letti realmente;
+7. section base distinta da handler symbol;
+8. placement blob verificato;
+9. branch target disassemblato;
+10. delta rispetto alla base;
+11. UF2 generato;
+12. UF2 -> RAW ricostruito indipendentemente;
+13. confronto byte-per-byte;
+14. SHA finale;
+15. test reale sul SideWinder.
+
+MAI ripetere l'errore A8/A9:
+non inserire un blob all'indirizzo del simbolo handler se il linker l'ha
+costruito rispetto a una section base diversa.
+
+
+================================================================================
+35. RAM / ARCHITETTURA CUSTOM
+================================================================================
+
+Nel percorso finale sono state usate aree RAM separate per evitare overlap.
+
+Intervalli auditati indicativamente:
+
+    FFB queue:
+        0x20010000 ...
+
+    FFB engine state:
+        0x20012000 ...
+
+    input filtering state:
+        0x20012E00 ...
+
+    pacing state:
+        0x20012F00 ...
+
+Il report originale SideWinder/PicoWinder vive in altra area.
+
+La race condition della prima FINAL è stata eliminata:
+l'IRQ rimane proprietario del report RAW; il filtro usa una copia locale.
+
+
+================================================================================
+36. DESCRIZIONE ALGORITMICA DEL FIRMWARE FINALE
+================================================================================
+
+LOOP INPUT
+----------
+
+SideWinder gameport
+    ->
+PIO / decoder
+    ->
+report RAW
+    ->
+snapshot locale
+    ->
+X/Y tracking hysteresis
+slider A20 idle-lock/tracking
+Z LUT + slew
+    ->
+USB HID ~1 kHz
+
+
+LOOP FFB
+--------
+
+Windows / Condor DirectInput PID
+    ->
+TinyUSB HID OUTPUT/FEATURE
+    ->
+effect translation
+    ->
+FIFO non bloccante
+    ->
+message parser
+    ->
+SideWinder pacing
+    ->
+UART ~31.25 kbaud
+    ->
+motori SideWinder
+
+
+RESET
+-----
+
+Device Reset
+    ->
+SideWinder reset
+    ->
+disabilita autocenter nativo
+    ->
+75 ms async stabilization
+    ->
+continua coda
+
+
+SPRING
+------
+
+DirectInput SetCondition
+    ->
+offset = trim/center
+strength stock = positiveCoefficient >> 1
+    ->
+se tipo fisico = SPRING:
+        strength_final = round(strength^2 / 127)
+    ->
+SideWinder OFFSET / STRENGTH
+
+
+PERIODIC
+--------
+
+DirectInput SetEffect gain
+    ->
+SideWinder MODIFY_GAIN = gain
+
+NON:
+    gain >> 1
+
+
+================================================================================
+37. FILE FINALE DA CONSERVARE
+================================================================================
+
+Pacchetto principale:
+
+    PicoWinder_Condor_FINAL_A20_AXIS_REFINEMENT_source_and_firmware.zip
+
+Contiene:
+- UF2
+- RAW
+- sorgente filtro A20
+- linker
+- sorgenti FFB attivi / riferimenti
+- audit
+- disassembly
+- rebuild script
+- base FW17 testata
+- GPL-3.0
+
+Firmware da flashare:
+
+    PicoWinder_Condor_FINAL_A20_AXIS_REFINEMENT.uf2
+
+SHA-256:
+
+    a3556c05d7068d3646bc2eefdaa1b9d459b780d3298c9aa2b18ea4c9f87d1917
+
+
+================================================================================
+38. VERSIONI DA NON USARE COME BASE
+================================================================================
+
+Da NON usare:
+
+- V20/21/22 di una fase precedente: rebuild cattivi / non validi
+- A5: regressione PID handshake
+- A8/A9: placement/linker bug
+- vecchi firmware con kick attivo
+- versioni pre-A10 per il motore Condition/FFB
+
+Base storica buona:
+    A10
+
+Base stabile:
+    A12/A13
+
+FFB ben tarato:
+    A15
+
+Input stabile:
+    A20
+
+
+================================================================================
+39. CRONOLOGIA RAPIDA VERSIONI
+================================================================================
+
+A2  RESETFIX
+    -> elimina autocenter nativo residuo dopo Reset
+
+A3  ABI_EFFECT_TABLE_FIX
+    -> effect table byte-correct
+
+A4  NONBLOCKING_DEFINE
+    -> niente UART blocking in callback HID
+
+A5  HID_PID_HANDSHAKE
+    -> regressione, scartato
+
+A6  SYNC_START
+    -> test START
+
+A7  START_BYPASS
+    -> dimostra che START non è causa primaria
+
+A8/A9
+    -> build invalidi per placement errato
+
+A10 FIXED_HANDLER_REAL_START
+    -> prima vera base buona
+
+A11 RESET_GUARD
+    -> 75 ms post-reset
+
+A12 MESSAGE_PACING
+    -> 1 ms tra messaggi logici, 75 ms reset
+
+A13 NO_KICK
+    -> elimina root cause principale del freeze FFB
+
+A14 PERIODIC_GAIN_FIX
+    -> gain non dimezzato
+
+A15 SPRING_CURVE
+    -> curva progressiva forza/velocità
+
+A16 AXIS_HYSTERESIS
+    -> X/Y +/-4
+
+A17 SLIDER_HYSTERESIS
+    -> primo filtro slider
+
+FIRST FINAL / AUDITED V2
+    -> scoperta e fix race buffer input
+
+A19 TEMPORAL_AXIS_FILTER
+    -> full range slider, primo filtro Z
+
+A20 AXIS_REFINEMENT
+    -> slider idle-lock/tracking
+    -> Z wide deadzone + LUT + slew
+    -> RELEASE FINALE
+
+
+================================================================================
+40. COSA FARE SE IN FUTURO COMPARE UN NUOVO PROBLEMA
+================================================================================
+
+NON cambiare subito firmware.
+
+Prima:
+1. riprodurre il problema;
+2. registrare USBPcap;
+3. annotare momento preciso;
+4. distinguere:
+   - input USB
+   - host FFB
+   - SideWinder physical behavior
+5. verificare se Condor continua a mandare SetCondition/SetEffect;
+6. verificare START/STOP/RESET;
+7. verificare frequenza report input;
+8. cambiare UNA SOLA VARIABILE.
+
+Se il problema è:
+- freeze FFB:
+    controllare kick-like stale ID / reset / queue
+- molla residua:
+    controllare Device Reset e autocenter nativo
+- periodic debole:
+    controllare gain translation
+- molla troppo forte:
+    NON cambiare subito coefficiente stock; valutare curva
+- jitter:
+    analizzare raw PCAP e scegliere filtro specifico
+- asse a gradini:
+    non usare gate temporale indiscriminato
+
+
+================================================================================
+41. LIMITI / FATTI NON DA CONFONDERE
+================================================================================
+
+1) USBPcap vede traffico USB HOST <-> RP2040.
+   NON vede direttamente i byte UART locali RP2040 -> SideWinder.
+
+2) Quando si deduce un comando fisico locale (es. stale kick ID2), bisogna
+   distinguere:
+   - osservazione USB
+   - disassembly firmware
+   - inferenza sul comando UART.
+
+3) 1 ms pacing:
+   empiricamente valido e stabile.
+   NON dichiararlo specifica ufficiale universale SideWinder se non emerge
+   una fonte primaria che lo dimostri.
+
+4) Alcuni transitori FFB iniziali:
+   sembrano generati da Condor.
+   Non "correggerli" nel firmware senza evidenza.
+
+
+================================================================================
+42. RISULTATO FINALE DEL PROGETTO
+================================================================================
+
+Il risultato finale non è più:
+
+    "SideWinder gameport che funziona come joystick USB"
+
+ma:
+
+    "SideWinder Force Feedback Pro gameport usabile realmente in Condor 3
+     con FFB dinamico, trim, buffet, flutter e comportamento stabile."
+
+Le prove finali mostrano:
+
+- assi input a circa 1 kHz;
+- FFB host regolare;
+- nessun freeze;
+- zero errori USB significativi nelle sessioni finali;
+- Spring dinamica;
+- periodic dinamici;
+- trim realmente trasmesso;
+- buffet distinguibile;
+- flutter distinguibile;
+- cleanup completo;
+- nessuna molla residua;
+- filtri assi funzionali.
+
+
+================================================================================
+43. ISTRUZIONE SPECIFICA PER UNA FUTURA CHATGPT
+================================================================================
+
+Se stai leggendo questo file in una nuova chat:
+
+NON ricominciare da PicoWinder originale.
+NON suggerire di riattivare il kick.
+NON rimuovere pacing/reset guard senza una prova.
+NON cambiare la curva Spring senza un difetto concreto.
+NON riscrivere da zero la parte FFB solo per "pulizia".
+
+Considera:
+
+    A20 = GOLDEN BASE
+
+Prima di fare qualsiasi modifica:
+- chiedi il PCAP del problema;
+- confrontalo con il comportamento atteso;
+- modifica una sola cosa;
+- fai audit binario completo.
+
+Se l'utente dice che tutto funziona:
+NON creare un A21 "per ottimizzare".
+Il progetto è volutamente congelato su A20.
+
+
+================================================================================
+44. NOTA GITHUB / CREDITI
+================================================================================
+
+Per una pubblicazione GitHub sarebbe corretto includere:
+
+- chiaro riferimento al progetto upstream PicoWinder;
+- autore upstream Nolan Nicholson;
+- link al repository originale;
+- GPL-3.0;
+- descrizione delle modifiche Condor/FFB;
+- avvertenza che è un firmware sperimentale/non ufficiale;
+- hardware target RP2040 / RP2040-Zero;
+- istruzioni di flash UF2;
+- SHA della release;
+- questo documento o una versione README derivata.
+
+Suggerimento struttura repository:
+
+    README.md
+    LICENSE
+    firmware/
+        PicoWinder_Condor_FINAL_A20_AXIS_REFINEMENT.uf2
+    src/
+        sorgenti finali
+    docs/
+        MEGA_HANDOFF.txt
+        FINAL_A20_DEEP_AUDIT.txt
+        protocol_notes.md
+    tools/
+        rebuild script
+
+
+================================================================================
+45. CONCLUSIONE
+================================================================================
+
+Dopo molte build, numerosi PCAP e una diagnostica progressivamente più
+rigorosa, i problemi principali sono stati isolati uno per uno:
+
+- Reset/autocenter nativo
+- blocking UART
+- effect table ABI
+- Condition semantics
+- placement linker
+- reset timing
+- message pacing
+- stale kick ID2
+- periodic gain dimezzato
+- Spring troppo aggressiva
+- jitter X/Y
+- slider jitter / full-range loss
+- race sul report globale
+- Z a gradini
+
+La versione A20 incorpora tutte le correzioni necessarie mantenendo il
+percorso FFB già validato.
+
+STATO FINALE:
+
+    PICOWINDER CONDOR FINAL A20
+    CONSIDERATO FUNZIONANTE E DEFINITIVO
+    FINCHÉ NON EMERGE UN DIFETTO CONCRETO.
+
+================================================================================
+FINE DOCUMENTO
+================================================================================
+
+
+================================================================================
+ADDENDUM FINAL A21 / A22 — 19 AUGUST 2026
+================================================================================
+
+A21 SPRING_RESHAPE
+------------------
+A20 was already stable but its centering/resistance felt too light once the glider moved above roughly the low-speed region. The user requested ONLY additional hardness relative to A20, preserving the already very light low-speed feel.
+
+A21 changes only the 128-byte Spring LUT. Design rule: A21 >= A20 at every input. A20 is unchanged through Spring input 82; a smooth positive uplift rises to about +16/127 around input 108-110 and then smoothly reconverges to 127. The user flight-tested A21 and reported the curve was centered exactly on the desired feel.
+
+A22 DEVICE_NAME
+---------------
+A22 is the definitive release. Functionally it is exact A21. The only change is the USB Product String:
+
+    Picowinder  ->  Picowinder FFB PRO
+
+VID/PID, FFB code, A21 Spring LUT, A20 input filters, pacing, reset handling and all other behavior are unchanged.
+
+FINAL A22 hashes:
+RAW  e074ab3b7babb206b532ba035124a6606296e0dab4012b32479f86b8af714f8b
+UF2  49279876c95b18d4316cdd96e057593b9fdb733f064c0650adf3d5b9416b8103
+
+For any future ChatGPT session: A22, not A20/A21, is now the definitive/golden release unless the user explicitly reports a newer version. Do not change a working subsystem without a concrete defect and a new PCAP/test case.

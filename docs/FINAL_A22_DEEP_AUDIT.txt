@@ -1,0 +1,93 @@
+PicoWinder Condor FINAL A22 DEVICE NAME
+DEEP BINARY AUDIT
+============================================================
+
+PURPOSE
+-------
+Cosmetic-only USB Product String rename:
+
+OLD: Picowinder
+NEW: Picowinder FFB PRO
+
+BASE
+----
+Exact validated A21 UF2 SHA256:
+839644adea2fe951ea626ea32b2c415b5dcacd6da6651da15b143994a01ba297
+
+Exact reconstructed A21 RAW SHA256:
+df4b129580a238a91a0c0b1f8ead90cfa8a610a58a4527633cbbad5a00c4cff8
+
+USB STRING TABLE VERIFIED IN BINARY
+-----------------------------------
+string_desc_arr table raw offset: 0x581C
+
+[0] 0x10004384  language ID bytes
+[1] 0x10004274  "Nolbinsoft"
+[2] 0x10004284  "Picowinder"
+[3] 0x00000000  serial generated dynamically
+
+Product pointer location:
+raw 0x5824 / flash 0x10005824
+
+A22 changes that pointer to:
+0x10007048
+
+New C-string stored in previously erased padding:
+raw 0x7048 / flash 0x10007048
+
+String:
+"Picowinder FFB PRO\0"
+
+CHANGE SCOPE
+------------
+No executable code is changed.
+
+The only changes are:
+1) the four-byte product-string pointer at 0x5824;
+2) the new 19-byte C-string written into bytes that were 0xFF padding.
+
+Original "Picowinder" bytes remain untouched at 0x4284, but are no longer
+referenced by string_desc_arr[2].
+
+A21 Spring LUT at 0x6C40..0x6CBF:
+BYTE-IDENTICAL.
+
+All A21 FFB code:
+BYTE-IDENTICAL.
+
+All A21 input filtering:
+BYTE-IDENTICAL.
+
+VID/PID:
+UNCHANGED.
+
+Manufacturer string:
+UNCHANGED ("Nolbinsoft").
+
+Serial-number behavior:
+UNCHANGED.
+
+UF2
+---
+Block count unchanged: 113
+
+Only payload pages changed:
+- 0x10005800 page (product pointer)
+- 0x10007000 page (new string in erased padding)
+
+Independent UF2 -> RAW reconstruction:
+EXACT MATCH.
+
+OUTPUT
+------
+A22 RAW SHA256:
+e074ab3b7babb206b532ba035124a6606296e0dab4012b32479f86b8af714f8b
+
+A22 UF2 SHA256:
+49279876c95b18d4316cdd96e057593b9fdb733f064c0650adf3d5b9416b8103
+
+CONCLUSION
+----------
+FINAL A22 is functionally identical to validated A21.
+Its only intended user-visible change is the USB product name:
+"Picowinder FFB PRO".
