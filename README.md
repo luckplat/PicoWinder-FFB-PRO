@@ -5,6 +5,7 @@ USB firmware for the **Microsoft SideWinder Force Feedback Pro (Gameport)** usin
 This project is based on Nolan Nicholson's original **PicoWinder** and continues that work with a large number of fixes and changes aimed at getting reliable joystick input and real DirectInput Force Feedback on **Windows 10 and Windows 11**.
 
 It has been tested with standard DirectInput FFB tools and extensively tested with <a href="https://www.condorsoaring.com/"><strong>Condor 3</strong></a>.
+<br>
 
 
 <p align="center">
