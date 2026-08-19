@@ -13,6 +13,10 @@ The firmware has been tested with standard DirectInput Force Feedback utilities 
 <p align="center">
   <em>Microsoft SideWinder Force Feedback Pro Gameport with the PicoWinder FFB PRO RP2040 USB adapter.</em>
 </p>
+<p align="center">
+  <strong>Would you like a ready-built PicoWinder FFB PRO adapter?</strong><br>
+  Feel free to contact me at <a href="mailto:luckplat@duck.com">luckplat@duck.com</a>
+</p>
 
 ---
 
