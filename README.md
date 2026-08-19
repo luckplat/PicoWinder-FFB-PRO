@@ -1,12 +1,12 @@
 # PicoWinder FFB PRO — FINAL
 
 USB firmware for the **Microsoft SideWinder Force Feedback Pro (Gameport)** using an RP2040 / RP2040-Zero.
-
+<p align="center">
 This project is based on Nolan Nicholson's original **PicoWinder** and continues that work with a large number of fixes and changes aimed at getting reliable joystick input and real DirectInput Force Feedback on **Windows 10 and Windows 11**.
 
 It has been tested with standard DirectInput FFB tools and extensively tested with <a href="https://www.condorsoaring.com/"><strong>Condor 3</strong></a>.
 
-<p align="center">
+
   <img src="Images/Picowinder_FFB_PRO_01.jpg" width="650" alt="Microsoft SideWinder Force Feedback Pro with PicoWinder FFB PRO adapter">
 </p>
 
